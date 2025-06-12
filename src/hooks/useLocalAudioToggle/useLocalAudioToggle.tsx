@@ -1,18 +1,34 @@
 import { LocalAudioTrack } from 'twilio-video';
-import { useCallback } from 'react';
-import useIsTrackEnabled from '../useIsTrackEnabled/useIsTrackEnabled';
+import { useCallback, useState } from 'react';
 import useVideoContext from '../useVideoContext/useVideoContext';
 
 export default function useLocalAudioToggle() {
-  const { localTracks } = useVideoContext();
+  const { room, localTracks, getLocalAudioTrack, removeLocalAudioTrack, onError } = useVideoContext();
+
+  const localParticipant = room?.localParticipant;
   const audioTrack = localTracks.find(track => track.kind === 'audio') as LocalAudioTrack;
-  const isEnabled = useIsTrackEnabled(audioTrack);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const toggleAudioEnabled = useCallback(() => {
-    if (audioTrack) {
-      audioTrack.isEnabled ? audioTrack.disable() : audioTrack.enable();
+    if (!isPublishing) {
+      if (audioTrack) {
+        const localTrackPublication = localParticipant?.unpublishTrack(audioTrack);
+        // Workaround: Emit manually until SDK emits 'trackUnpublished'
+        localParticipant?.emit('trackUnpublished', localTrackPublication);
+        removeLocalAudioTrack();
+      } else {
+        setIsPublishing(true);
+        getLocalAudioTrack()
+          .then((track: LocalAudioTrack) => {
+            return localParticipant?.publishTrack(track);
+          })
+          .catch(onError)
+          .finally(() => {
+            setIsPublishing(false);
+          });
+      }
     }
-  }, [audioTrack]);
+  }, [audioTrack, localParticipant, getLocalAudioTrack, isPublishing, onError, removeLocalAudioTrack]);
 
-  return [isEnabled, toggleAudioEnabled] as const;
+  return [!!audioTrack, toggleAudioEnabled] as const;
 }

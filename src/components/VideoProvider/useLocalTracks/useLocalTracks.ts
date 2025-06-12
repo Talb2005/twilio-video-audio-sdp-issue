@@ -41,6 +41,26 @@ export default function useLocalTracks() {
     });
   }, []);
 
+  const getLocalAudioTrack = useCallback(async () => {
+    const selectedAudioDeviceId = window.localStorage.getItem(SELECTED_AUDIO_INPUT_KEY);
+
+    const { audioInputDevices } = await getDeviceInfo();
+
+    const hasSelectedAudioDevice = audioInputDevices.some(
+      device => selectedAudioDeviceId && device.deviceId === selectedAudioDeviceId
+    );
+
+    const options: CreateLocalTrackOptions = {
+      name: `microphone-${Date.now()}`,
+      ...(hasSelectedAudioDevice && { deviceId: { exact: selectedAudioDeviceId! } }),
+    };
+
+    return Video.createLocalAudioTrack(options).then(newTrack => {
+      setAudioTrack(newTrack);
+      return newTrack;
+    });
+  }, []);
+
   const removeLocalAudioTrack = useCallback(() => {
     if (audioTrack) {
       audioTrack.stop();
@@ -140,6 +160,7 @@ export default function useLocalTracks() {
   return {
     localTracks,
     getLocalVideoTrack,
+    getLocalAudioTrack,
     isAcquiringLocalTracks,
     removeLocalAudioTrack,
     removeLocalVideoTrack,
